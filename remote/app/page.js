@@ -167,10 +167,68 @@ export default function Home() {
 
     document.body.addEventListener('touchmove', function(e) { if (dragging) e.preventDefault(); }, { passive:false });
 
+    /* Keyboard controls */
+    const activeKeys = new Set();
+    
+    function handleKeyDown(e) {
+      // Prevent default for arrow keys and WASD
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(e.key)) {
+        e.preventDefault();
+      }
+      
+      // Ignore if already pressed (key repeat)
+      if (activeKeys.has(e.key)) return;
+      activeKeys.add(e.key);
+      
+      let dir = null;
+      switch(e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          dir = 'forward';
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          dir = 'backward';
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          dir = 'left';
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          dir = 'right';
+          break;
+        case ' ':
+          e.preventDefault();
+          sendStop();
+          break;
+      }
+      
+      if (dir) sendMove(dir);
+    }
+    
+    function handleKeyUp(e) {
+      activeKeys.delete(e.key);
+      
+      // Stop if it was a movement key
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(e.key)) {
+        sendStop();
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
     connectWS();
 
     return () => {
       if (ws) ws.close();
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, [wsUrl, useManualUrl]);
 
@@ -203,7 +261,7 @@ export default function Home() {
         .warning { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); background: rgba(255,200,0,0.15); border: 1px solid rgba(255,200,0,0.5); padding: 12px 20px; border-radius: 6px; font-size: 13px; color: #ffc800; text-align: center; max-width: 80%; }
       `}</style>
       
-      <div className="info">Dead zone: 20px • {defaultUrl ? `URL: ${defaultUrl}` : 'Manual mode'}</div>
+      <div className="info">Dead zone: 20px • Arrow keys/WASD to control • Space to stop • {defaultUrl ? `URL: ${defaultUrl}` : 'Manual mode'}</div>
       <div className="status" id="status">WS: connecting…</div>
 
       {useManualUrl && (
