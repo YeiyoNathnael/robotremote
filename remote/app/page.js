@@ -169,6 +169,8 @@ export default function Home() {
 
     /* Keyboard controls */
     const activeKeys = new Set();
+    let keyInterval = null;
+    let currentKeyDir = null;
     
     function handleKeyDown(e) {
       // Prevent default for arrow keys and WASD
@@ -176,7 +178,7 @@ export default function Home() {
         e.preventDefault();
       }
       
-      // Ignore if already pressed (key repeat)
+      // Ignore if already pressed (prevents key repeat spam)
       if (activeKeys.has(e.key)) return;
       activeKeys.add(e.key);
       
@@ -208,7 +210,18 @@ export default function Home() {
           break;
       }
       
-      if (dir) sendMove(dir);
+      if (dir) {
+        currentKeyDir = dir;
+        sendMove(dir);
+        
+        // Start interval to keep sending while held
+        if (keyInterval) clearInterval(keyInterval);
+        keyInterval = setInterval(() => {
+          if (currentKeyDir) {
+            sendMove(currentKeyDir);
+          }
+        }, 100); // Send every 100ms while held
+      }
     }
     
     function handleKeyUp(e) {
@@ -216,6 +229,11 @@ export default function Home() {
       
       // Stop if it was a movement key
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(e.key)) {
+        currentKeyDir = null;
+        if (keyInterval) {
+          clearInterval(keyInterval);
+          keyInterval = null;
+        }
         sendStop();
       }
     }
@@ -227,6 +245,7 @@ export default function Home() {
 
     return () => {
       if (ws) ws.close();
+      if (keyInterval) clearInterval(keyInterval);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
