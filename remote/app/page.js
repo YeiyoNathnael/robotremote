@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  // Use environment variable or fallback to manual input
+  const defaultUrl = process.env.NEXT_PUBLIC_ARDUINO_WS_URL || '';
+  const [wsUrl, setWsUrl] = useState(defaultUrl);
+  const [isConnected, setIsConnected] = useState(false);
+  const [useManualUrl, setUseManualUrl] = useState(!defaultUrl);
+
   useEffect(() => {
     /* Config */
     const DEAD_ZONE = 20;
-    const ARDUINO_WS_PORT = 81;
 
     /* DOM */
     const joystick = document.getElementById('joystick');
@@ -21,7 +26,11 @@ export default function Home() {
 
     /* Build websocket address */
     function buildWsUrl() {
-      return "ws://10.77.0.10:81";
+      // If manual URL mode and URL doesn't include protocol, add ws://
+      if (useManualUrl && wsUrl && !wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+        return `ws://${wsUrl}:81`;
+      }
+      return wsUrl;
     }
 
     /* Connect websocket */
@@ -33,18 +42,22 @@ export default function Home() {
       } catch (e) {
         statusEl.textContent = 'WS: error';
         console.error(e);
+        setIsConnected(false);
         return;
       }
 
       ws.onopen = () => {
         statusEl.textContent = 'WS: connected';
+        setIsConnected(true);
       };
       ws.onclose = () => {
         statusEl.textContent = 'WS: closed';
+        setIsConnected(false);
         setTimeout(connectWS, 1000);
       };
       ws.onerror = (e) => {
         statusEl.textContent = 'WS: error';
+        setIsConnected(false);
       };
       ws.onmessage = (ev) => {
         // optional: handle status messages from Arduino
@@ -159,7 +172,7 @@ export default function Home() {
     return () => {
       if (ws) ws.close();
     };
-  }, []);
+  }, [wsUrl, useManualUrl]);
 
   return (
     <>
@@ -182,10 +195,44 @@ export default function Home() {
         .info{position:absolute;left:8px;top:8px;font-size:12px;opacity:0.8;color:#ccc;}
         input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;background:#3db3ff;border-radius:50%;border:2px solid #0f1113;}
         .status { position: absolute; right: 8px; top: 8px; font-size:12px; opacity:0.9; color:#cfc; }
+        .ip-config { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; z-index: 100; }
+        .ip-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 12px; width: 140px; }
+        .connect-btn { background: #3db3ff; border: none; color: #fff; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        .connect-btn:hover { background: #2a9de6; }
+        .connect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .warning { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); background: rgba(255,200,0,0.15); border: 1px solid rgba(255,200,0,0.5); padding: 12px 20px; border-radius: 6px; font-size: 13px; color: #ffc800; text-align: center; max-width: 80%; }
       `}</style>
       
-      <div className="info">Dead zone: 20px • WebSocket port: 81</div>
+      <div className="info">Dead zone: 20px • {defaultUrl ? `URL: ${defaultUrl}` : 'Manual mode'}</div>
       <div className="status" id="status">WS: connecting…</div>
+
+      {useManualUrl && (
+        <div className="ip-config">
+          <input 
+            type="text" 
+            className="ip-input" 
+            value={wsUrl}
+            onChange={(e) => setWsUrl(e.target.value)}
+            placeholder="ws://10.77.0.10:81 or wss://robot.yourdomain.com"
+            disabled={isConnected}
+            style={{width: '280px'}}
+          />
+          <button 
+            className="connect-btn"
+            onClick={() => setWsUrl(wsUrl)}
+            disabled={isConnected}
+          >
+            {isConnected ? 'Connected' : 'Connect'}
+          </button>
+        </div>
+      )}
+
+      {typeof window !== 'undefined' && window.location.protocol === 'https:' && wsUrl.startsWith('ws://') && (
+        <div className="warning">
+          ⚠️ HTTPS sites cannot connect to insecure WebSocket (ws://). 
+          Use wss:// (Cloudflare Tunnel) or open via HTTP.
+        </div>
+      )}
 
       <div className="container">
         <div className="left">
